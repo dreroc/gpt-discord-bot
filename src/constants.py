@@ -2,7 +2,8 @@ from dotenv import load_dotenv
 import os
 import dacite
 import yaml
-from typing import Dict, List
+from typing import Dict, List, Literal
+
 from src.base import Config
 
 load_dotenv()
@@ -21,6 +22,7 @@ EXAMPLE_CONVOS = CONFIG.example_conversations
 DISCORD_BOT_TOKEN = os.environ["DISCORD_BOT_TOKEN"]
 DISCORD_CLIENT_ID = os.environ["DISCORD_CLIENT_ID"]
 OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+DEFAULT_MODEL = os.environ["DEFAULT_MODEL"]
 
 ALLOWED_SERVER_IDS: List[int] = []
 server_ids = os.environ["ALLOWED_SERVER_IDS"].split(",")
@@ -37,9 +39,13 @@ for s in server_channels:
 BOT_INVITE_URL = f"https://discord.com/api/oauth2/authorize?client_id={DISCORD_CLIENT_ID}&permissions=328565073920&scope=bot"
 
 MODERATION_VALUES_FOR_BLOCKED = {
+    "harassment": 0.5,
+    "harassment/threatening": 0.1,
     "hate": 0.5,
     "hate/threatening": 0.1,
     "self-harm": 0.2,
+    "self-harm/instructions": 0.5,
+    "self-harm/intent": 0.7,
     "sexual": 0.5,
     "sexual/minors": 0.2,
     "violence": 0.7,
@@ -47,9 +53,13 @@ MODERATION_VALUES_FOR_BLOCKED = {
 }
 
 MODERATION_VALUES_FOR_FLAGGED = {
+    "harassment": 0.5,
+    "harassment/threatening": 0.1,
     "hate": 0.4,
     "hate/threatening": 0.05,
     "self-harm": 0.1,
+    "self-harm/instructions": 0.5,
+    "self-harm/intent": 0.7,
     "sexual": 0.3,
     "sexual/minors": 0.1,
     "violence": 0.1,
@@ -65,3 +75,5 @@ INACTIVATE_THREAD_PREFIX = "💬❌"
 MAX_CHARS_PER_REPLY_MSG = (
     1500  # discord has a 2k limit, we just break message into 1.5k
 )
+
+AVAILABLE_MODELS = Literal["gpt-3.5-turbo", "gpt-4", "gpt-4-1106-preview", "gpt-4-32k"]

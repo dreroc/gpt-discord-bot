@@ -1,6 +1,8 @@
 from enum import Enum
 from dataclasses import dataclass
 import openai
+from openai import AsyncOpenAI
+
 from src.moderation import moderate_message
 from typing import Optional, List
 from src.constants import (
@@ -9,7 +11,7 @@ from src.constants import (
     EXAMPLE_CONVOS,
 )
 import discord
-from src.base import Message, Prompt, Conversation
+from src.base import Message, Prompt, Conversation, ThreadConfig
 from src.utils import split_into_shorter_messages, close_thread, logger
 from src.moderation import (
     send_moderation_flagged_message,
@@ -36,30 +38,33 @@ class CompletionData:
     status_text: Optional[str]
 
 
+client = AsyncOpenAI()
+
+
 async def generate_completion_response(
-    messages: List[Message], user: str
+    messages: List[Message], user: str, thread_config: ThreadConfig
 ) -> CompletionData:
     try:
         prompt = Prompt(
             header=Message(
-                "System", f"Instructions for {MY_BOT_NAME}: {BOT_INSTRUCTIONS}"
+                "system", f"Instructions for {MY_BOT_NAME}: {BOT_INSTRUCTIONS}"
             ),
             examples=MY_BOT_EXAMPLE_CONVOS,
-            convo=Conversation(messages + [Message(MY_BOT_NAME)]),
+            convo=Conversation(messages),
         )
-        rendered = prompt.render()
-        response = openai.Completion.create(
-            engine="text-davinci-003",
-            prompt=rendered,
-            temperature=1.0,
-            top_p=0.9,
-            max_tokens=512,
+        rendered = prompt.full_render(MY_BOT_NAME)
+        response = await client.chat.completions.create(
+            model=thread_config.model,
+            messages=rendered,
+            temperature=thread_config.temperature,
+            top_p=1.0,
+            max_tokens=thread_config.max_tokens,
             stop=["<|endoftext|>"],
         )
-        reply = response.choices[0].text.strip()
+        reply = response.choices[0].message.content.strip()
         if reply:
             flagged_str, blocked_str = moderate_message(
-                message=(rendered + reply)[-500:], user=user
+                message=(rendered[-1]["content"] + reply)[-500:], user=user
             )
             if len(blocked_str) > 0:
                 return CompletionData(
@@ -78,8 +83,8 @@ async def generate_completion_response(
         return CompletionData(
             status=CompletionResult.OK, reply_text=reply, status_text=None
         )
-    except openai.error.InvalidRequestError as e:
-        if "This model's maximum context length" in e.user_message:
+    except openai.BadRequestError as e:
+        if "This model's maximum context length" in str(e):
             return CompletionData(
                 status=CompletionResult.TOO_LONG, reply_text=None, status_text=str(e)
             )
